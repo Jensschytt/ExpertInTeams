@@ -14,6 +14,7 @@ def generate_frames():
         # Capture frame-by-frame
         success, frame = video_capture.read()
         if not success:
+            print("")
             break
         else:
             # Encode the frame in JPEG format
@@ -23,6 +24,7 @@ def generate_frames():
             # Yield the frame in the required format
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+generate_frames()
 
 @app.route('/')
 def index():
