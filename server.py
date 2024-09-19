@@ -1,7 +1,6 @@
 import pickle
 import socket
 import struct
-
 import cv2
 
 HOST = ''
@@ -20,7 +19,17 @@ conn, addr = s.accept()
 data = b'' ### CHANGED
 payload_size = struct.calcsize("L") ### CHANGED
 
+
+
+
+
+
+
+
 while True:
+
+
+
 
     # Retrieve message size
     while len(data) < payload_size:
