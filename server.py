@@ -2,7 +2,10 @@ import pickle
 import socket
 import struct
 import cv2
+import numpy as np
 from ultralytics import YOLO
+
+print(pickle.format_version)
 
 # Load the YOLOv8 model (e.g., yolov8n for speed)
 model = YOLO('yolov8n.pt')
@@ -24,8 +27,6 @@ data = b'' ### CHANGED
 payload_size = struct.calcsize("L") ### CHANGED
 
 
-
-
 while True:
 
     # Retrieve message size
@@ -43,8 +44,11 @@ while True:
     frame_data = data[:msg_size]
     data = data[msg_size:]
 
+    print(frame_data[:100])
+
     # Extract frame
     frame = pickle.loads(frame_data)
+    #frame = np.load(frame_data, allow_pickle=True)
 
 
 
