@@ -4,152 +4,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Webcam Stream and Object Detection Stats</title>
+    <title>YOLO Processed Video Feed</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
-        :root {
-            --background-color: #1a1a1a;
-            --text-color: #f0f0f0;
-            --highlight-color: #00e676;
-            --box-background: rgba(255, 255, 255, 0.1);
-            --shadow-color: rgba(0, 0, 0, 0.7);
-        }
-
         body {
             font-family: 'Poppins', sans-serif;
-            background: var(--background-color);
-            color: var(--text-color);
+            background: #1a1a1a;
+            color: #f0f0f0;
+            text-align: center;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
-            overflow: hidden;
-            text-align: center;
-            transition: background 0.5s, color 0.5s;
         }
 
         h1 {
-            font-weight: 600;
-            font-size: 3em;
-            margin-bottom: 20px;
-            color: var(--highlight-color);
-            text-shadow: 0 5px 15px rgba(0, 230, 118, 0.3);
+            margin: 20px;
         }
 
-        #video-container {
-            border: 5px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 8px 20px var(--shadow-color);
+        .video-container {
+            border: 5px solid #00e676;
+            margin: 20px;
             width: 640px;
             height: 480px;
-            overflow: hidden;
-            border-radius: 20px;
-            transition: transform 0.5s;
+            border-radius: 15px;
         }
 
-        #video-container:hover {
-            transform: scale(1.05);
-        }
-
-        #video-feed {
+        img {
             width: 100%;
             height: 100%;
-            filter: brightness(0.8) contrast(1.1);
-        }
-
-        #stats {
-            width: 640px;
-            background: var(--box-background);
-            padding: 20px;
-            border-radius: 20px;
-            margin-top: 20px;
-            box-shadow: 0 8px 20px var(--shadow-color);
-            backdrop-filter: blur(5px);
-            transition: all 0.3s ease;
-        }
-
-        .stat-item {
-            font-weight: 400;
-            margin-bottom: 10px;
-            font-size: 1.2em;
-            color: #b3b3b3;
-        }
-
-        .stat-item strong {
-            font-weight: 600;
-            color: var(--highlight-color);
-        }
-
-        #toggle-button {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: var(--highlight-color);
-            color: var(--background-color);
-            border: none;
-            padding: 10px 20px;
-            border-radius: 20px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background 0.3s, color 0.3s, transform 0.3s;
-        }
-
-        #toggle-button:hover {
-            transform: scale(1.1);
+            border-radius: 15px;
         }
     </style>
 </head>
 
 <body>
-    <button id="toggle-button">Switch to Light Mode</button>
-    <h1>Live Webcam & Object Detection</h1>
-    <div id="video-container">
-        <img id="video-feed" src="{{ url_for('video_feed') }}" alt="Video Stream">
+    <h1>YOLO-Processed Video Feed</h1>
+    <div class="video-container">
+        <img id="processed-feed" src="{{ url_for('processed_feed') }}" alt="YOLO Processed Stream">
     </div>
-    <div id="stats">
-        <h2><i class="fas fa-chart-bar icon"></i>Detection Stats</h2>
-        <div class="stat-item"><strong>Object Count:</strong> <span id="object-count">0</span></div>
-        <div class="stat-item"><strong>Detected Objects:</strong> <span id="detected-objects">None</span></div>
-    </div>
-
-    <script>
-        const toggleButton = document.getElementById('toggle-button');
-        let darkMode = true;
-
-        toggleButton.addEventListener('click', () => {
-            if (darkMode) {
-                document.documentElement.style.setProperty('--background-color', '#f0f0f0');
-                document.documentElement.style.setProperty('--text-color', '#1a1a1a');
-                document.documentElement.style.setProperty('--highlight-color', '#007bff');
-                document.documentElement.style.setProperty('--box-background', 'rgba(0, 0, 0, 0.1)');
-                toggleButton.textContent = 'Switch to Dark Mode';
-                darkMode = false;
-            } else {
-                document.documentElement.style.setProperty('--background-color', '#1a1a1a');
-                document.documentElement.style.setProperty('--text-color', '#f0f0f0');
-                document.documentElement.style.setProperty('--highlight-color', '#00e676');
-                document.documentElement.style.setProperty('--box-background', 'rgba(255, 255, 255, 0.1)');
-                toggleButton.textContent = 'Switch to Light Mode';
-                darkMode = true;
-            }
-        });
-
-        async function fetchStats() {
-            try {
-                const response = await fetch('/stats');
-                const data = await response.json();
-
-                document.getElementById('object-count').textContent = data.object_count;
-                document.getElementById('detected-objects').textContent = data.detected_objects.join(", ");
-            } catch (error) {
-                console.error("Error fetching stats:", error);
-            }
-        }
-
-        setInterval(fetchStats, 1000);
-    </script>
 </body>
 
 </html>
