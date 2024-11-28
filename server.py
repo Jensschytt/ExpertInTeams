@@ -1,13 +1,10 @@
-import pickle
 import socket
+import pickle
 import struct
 import cv2
-import numpy as np
 from ultralytics import YOLO
 
-print(pickle.format_version)
-
-# Load the YOLOv8 model (e.g., yolov8n for speed)
+# Load the YOLOv8 model
 model = YOLO('yolov8n.pt')
 
 HOST = ''
@@ -23,54 +20,68 @@ print('Socket now listening')
 
 conn, addr = s.accept()
 
-data = b'' ### CHANGED
-payload_size = struct.calcsize("L") ### CHANGED
+def recv_all(conn, size):
+    data = b''
+    while len(data) < size:
+        try:
+            packet = conn.recv(size - len(data))
+            if not packet:
+                return None  # Connection closed
+            data += packet
+        except socket.error as e:
+            print(f"Socket error: {e}")
+            return None
+    return data
 
+# Fixed message size for the frame length (4 bytes)
+payload_size = struct.calcsize("!I")
 
-while True:
+try:
+    while True:
+        # Retrieve exactly 4 bytes of the message size
+        packed_msg_size = recv_all(conn, payload_size)
+        if packed_msg_size is None:
+            print("Connection closed by client")
+            break
 
-    # Retrieve message size
-    while len(data) < payload_size:
-        data += conn.recv(4096)
+        # Now safely unpack the message size (4-byte unsigned integer)
+        msg_size = struct.unpack("!I", packed_msg_size)[0]
+        print(f"Receiving frame of size: {msg_size}")
 
-    packed_msg_size = data[:payload_size]
-    data = data[payload_size:]
-    msg_size = struct.unpack("L", packed_msg_size)[0] ### CHANGED
+        # Retrieve the frame data of size 'msg_size'
+        frame_data = recv_all(conn, msg_size)
+        if frame_data is None:
+            print("Connection closed or error receiving frame data")
+            break
 
-    # Retrieve all data based on message size
-    while len(data) < msg_size:
-        data += conn.recv(4096)
+        # Extract frame and handle exceptions
+        try:
+            frame = pickle.loads(frame_data)
+        except Exception as e:
+            print(f"Error while deserializing frame: {e}")
+            break
 
-    frame_data = data[:msg_size]
-    data = data[msg_size:]
+        # Run YOLOv8 inference on the frame
+        results = model(frame, verbose=False)
 
-    print(frame_data[:100])
+        # Get detected labels from the result
+        for result in results:
+            labels = result.names  # Accessing label names
+            detected_classes = result.boxes.cls
 
-    # Extract frame
-    frame = pickle.loads(frame_data)
-    #frame = np.load(frame_data, allow_pickle=True)
+            # Convert class indexes to labels and print
+            for class_index in detected_classes:
+                print(f"Detected object: {labels[int(class_index)]}")
 
+        # Visualize the results (bounding boxes, labels, etc.)
+        annotated_frame = results[0].plot()
 
+        # Display the frame with detections
+        cv2.imshow("YOLOv8 Real-time Detection", annotated_frame)
+        cv2.waitKey(1)
 
-    # Run YOLOv8 inference on the frame
-    results = model(frame, verbose=False)
-
-    # Get detected labels from the result
-    for result in results:
-        labels = result.names  # Accessing label names
-        detected_classes = result.boxes.cls
-
-    # Convert class indexes to labels and print
-        for class_index in detected_classes:
-            print(f"Detected object: {labels[int(class_index)]}")
-    
-
-    print("test")
-    # Visualize the results (bounding boxes, labels, etc.)
-    annotated_frame = results[0].plot()
-
-    # Display the frame with detections
-    cv2.imshow("YOLOv8 Real-time Detection", annotated_frame)
-
-    # Display
-    cv2.waitKey(1)
+except Exception as e:
+    print(f"Server error: {e}")
+finally:
+    print("Closing connection")
+    conn.close()

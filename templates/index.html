@@ -1,10 +1,269 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Video Stream</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Warehouse Cam</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Styling for page and chart */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #007BFF;
+        }
+        .video-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .statistics-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .statistics-header {
+            text-align: center;
+            font-size: 18px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        .statistics {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            justify-content: space-around;
+            font-size: 16px;
+        }
+        .statistics li {
+            flex: 1;
+            text-align: center;
+            border-right: 1px solid #ddd;
+        }
+        .statistics li:last-child {
+            border-right: none;
+        }
+        .tabs {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: 1px solid #ddd;
+            background-color: #fff;
+            margin-right: 5px;
+        }
+        .tab.active {
+            background-color: #007BFF;
+            color: #fff;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .chart-container {
+            max-width: 800px;
+            margin: 20px auto;
+        }
+        .button-container {
+            text-align: center;
+            margin: 20px;
+        }
+        .button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #007BFF;
+            color: #fff;
+            font-size: 14px;
+        }
+    </style>
 </head>
 <body>
-    <h1>Video Stream</h1>
-    <img src="{{ url_for('video_feed') }}" style="width: 50%; height: 50%;">
+    <h1>Warehouse Cam</h1>
+    
+    <div class="video-container">
+        <img src="{{ url_for('processed_feed') }}" width="40%" alt="Live Video Feed">
+    </div>
+    
+    <div class="statistics-container">
+        <div class="statistics-header">Detected Objects Statistics</div>
+        <ul class="statistics">
+            <li>Person: <span id="person-count">0</span></li>
+            <li>Keyboard: <span id="keyboard">0</span></li>
+            <li>Remote: <span id="remote-count">0</span></li>
+        </ul>
+    </div>
+
+    <!-- Buttons for controlling the graph -->
+    <div class="button-container">
+        <button class="button" onclick="startMeasurement()">Start Measurement</button>
+        <button class="button" onclick="stopMeasurement()">Stop & Save Measurement</button>
+    </div>
+
+    <!-- Tabs for switching between live chart and history -->
+    <div class="tabs">
+        <div class="tab active" onclick="showTab('live')">Live Chart</div>
+        <div class="tab" onclick="showTab('history')">History</div>
+    </div>
+
+    <!-- Content for each tab -->
+    <div id="live" class="tab-content active">
+        <div class="chart-container">
+            <canvas id="personChart"></canvas>
+        </div>
+    </div>
+    <div id="history" class="tab-content">
+        <div class="chart-container" id="historyContainer">
+            <!-- Historical charts will be added here -->
+        </div>
+    </div>
+
+    <script>
+        let measurementInterval;
+        let measurementData = []; // Data for live chart
+        let historyCount = 0; // Counter for saved measurements
+
+        // Function to switch between tabs
+        function showTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+            document.querySelector(`.tab[onclick="showTab('${tab}')"]`).classList.add('active');
+            document.getElementById(tab).classList.add('active');
+        }
+
+        // Initialize live chart
+        const ctx = document.getElementById('personChart').getContext('2d');
+        const personChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [], // Timestamps
+                datasets: [{
+                    label: 'Persons Detected Over Time',
+                    data: [],
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                scales: {
+                    x: {
+                        type: 'category',
+                        title: {
+                            display: true,
+                            text: 'Time'
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Number of Persons'
+                        }
+                    }
+                }
+            }
+        });
+
+        // Function to start measurement
+        function startMeasurement() {
+            if (measurementInterval) return; // Already running
+            measurementData = []; // Reset data
+            personChart.data.labels = [];
+            personChart.data.datasets[0].data = [];
+            personChart.update();
+
+            measurementInterval = setInterval(() => {
+                fetch('/object_statistics')
+                    .then(response => response.json())
+                    .then(data => {
+                        const now = new Date().toLocaleTimeString();
+                        personChart.data.labels.push(now);
+                        personChart.data.datasets[0].data.push(data.person || 0);
+
+                        measurementData.push({ time: now, value: data.person || 0 });
+
+                        if (personChart.data.labels.length > 20) {
+                            personChart.data.labels.shift();
+                            personChart.data.datasets[0].data.shift();
+                        }
+
+                        personChart.update();
+                    })
+                    .catch(error => console.error('Error fetching statistics:', error));
+            }, 5000); // Update every 5 seconds
+        }
+
+        // Function to stop measurement and save to history
+        function stopMeasurement() {
+            if (!measurementInterval) return; // Not running
+            clearInterval(measurementInterval);
+            measurementInterval = null;
+
+            // Create a new canvas for the historical chart
+            const newCanvas = document.createElement('canvas');
+            newCanvas.id = `historyChart${historyCount}`;
+            document.getElementById('historyContainer').appendChild(newCanvas);
+
+            // Create a new chart with the saved data
+            const newCtx = newCanvas.getContext('2d');
+            new Chart(newCtx, {
+                type: 'line',
+                data: {
+                    labels: measurementData.map(d => d.time),
+                    datasets: [{
+                        label: `Measurement ${++historyCount}`,
+                        data: measurementData.map(d => d.value),
+                        borderColor: 'rgba(153, 102, 255, 1)',
+                        backgroundColor: 'rgba(153, 102, 255, 0.2)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    scales: {
+                        x: {
+                            type: 'category',
+                            title: {
+                                display: true,
+                                text: 'Time'
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Number of Persons'
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Increment history count for the next measurement
+            historyCount++;
+        }
+    </script>
 </body>
 </html>
